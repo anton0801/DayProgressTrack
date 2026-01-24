@@ -1,24 +1,42 @@
-//
-//  ContentView.swift
-//  FishProgressTrack
-//
-//  Created by Stepan Yarikova on 18/1/26.
-//
 
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var dataManager = GoalsDataManager()
+    @State private var showSplash = true
+    @State private var showOnboarding = false
+    @State private var currentOnboardingPage = 0
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        ZStack {
+            if showSplash {
+                SplashScreen(isPresented: $showSplash)
+            } else if showOnboarding {
+                OnboardingView(
+                    currentPage: $currentOnboardingPage,
+                    isPresented: $showOnboarding
+                )
+            } else {
+                MainNavigationView(dataManager: dataManager)
+            }
         }
-        .padding()
+        .preferredColorScheme(.dark)
+        .onAppear {
+            checkFirstLaunch()
+        }
+    }
+    
+    private func checkFirstLaunch() {
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+        if !hasLaunchedBefore {
+            showOnboarding = true
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+        }
     }
 }
 
-#Preview {
-    ContentView()
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+    }
 }
