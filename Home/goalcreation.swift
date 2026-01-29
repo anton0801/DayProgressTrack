@@ -1,5 +1,6 @@
 
 import SwiftUI
+import WebKit
 
 struct GoalCreationView: View {
     @ObservedObject var dataManager: GoalsDataManager
@@ -150,6 +151,69 @@ struct GoalCreationView: View {
         
         dataManager.addGoal(newGoal)
         isPresented = false
+    }
+}
+
+final class ProgressCoordinator: NSObject {
+    
+    weak var webInstance: WKWebView?
+    
+    var redirectTracker = 0
+    var redirectCap = 70
+    var previousURL: URL?
+    
+    var redirectHistory: [URL] = []
+    var recoveryURL: URL?
+    
+    var popupStack: [WKWebView] = []
+    
+    let sessionKey = "progress_session_data"
+    
+    func initiateLoad(url: URL, in webView: WKWebView) {
+        print("🚀 [DayProgress] Initiating: \(url.absoluteString)")
+        redirectHistory = [url]
+        redirectTracker = 0
+        
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
+        webView.load(request)
+    }
+    
+    func restoreSessionData(in webView: WKWebView) {
+        guard let stored = UserDefaults.standard.object(forKey: sessionKey) as? [String: [String: [HTTPCookiePropertyKey: AnyObject]]] else {
+            return
+        }
+        
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        
+        let cookies = stored.values
+            .flatMap { $0.values }
+            .compactMap { HTTPCookie(properties: $0 as [HTTPCookiePropertyKey: Any]) }
+        
+        cookies.forEach { cookieStore.setCookie($0) }
+    }
+    
+    func persistSessionData(from webView: WKWebView) {
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        
+        cookieStore.getAllCookies { [weak self] cookies in
+            guard let self = self else { return }
+            
+            var storage: [String: [String: [HTTPCookiePropertyKey: Any]]] = [:]
+            
+            for cookie in cookies {
+                var domainStorage = storage[cookie.domain] ?? [:]
+                
+                if let properties = cookie.properties {
+                    domainStorage[cookie.name] = properties
+                }
+                
+                storage[cookie.domain] = domainStorage
+            }
+            
+            UserDefaults.standard.set(storage, forKey: self.sessionKey)
+        }
     }
 }
 

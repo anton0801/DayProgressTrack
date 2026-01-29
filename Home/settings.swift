@@ -64,19 +64,40 @@ struct SettingsView: View {
                                 .foregroundColor(.mintAccent)
                                 .padding(.horizontal)
                             
-                            HStack {
-                                Image(systemName: "info.circle.fill")
-                                    .foregroundColor(.blueAccent)
-                                    .frame(width: 30)
+                            VStack {
+                                HStack {
+                                    Image(systemName: "info.circle.fill")
+                                        .foregroundColor(.blueAccent)
+                                        .frame(width: 30)
+                                    
+                                    Text("Version")
+                                        .foregroundColor(.primaryText)
+                                    
+                                    Spacer()
+                                    
+                                    Text("1.0.0")
+                                        .foregroundColor(.secondaryText)
+                                        .font(.system(size: 14))
+                                }
                                 
-                                Text("Version")
-                                    .foregroundColor(.primaryText)
-                                
-                                Spacer()
-                                
-                                Text("1.0.0")
-                                    .foregroundColor(.secondaryText)
-                                    .font(.system(size: 14))
+                                Button {
+                                    UIApplication.shared.open(URL(string: "https://dayprogresstrack.com/privacy-policy.html")!)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "info.circle.fill")
+                                            .foregroundColor(.blueAccent)
+                                            .frame(width: 30)
+                                        
+                                        Text("Privacy Policy")
+                                            .foregroundColor(.primaryText)
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                                .padding(.vertical)
                             }
                             .padding()
                             .background(Color.cardBlue)
@@ -94,4 +115,8 @@ struct SettingsView: View {
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
+}
+
+#Preview {
+    SettingsView()
 }

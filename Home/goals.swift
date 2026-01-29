@@ -1,5 +1,6 @@
 
 import SwiftUI
+import WebKit
 
 struct MainProgressScreen: View {
     @ObservedObject var dataManager: GoalsDataManager
@@ -179,6 +180,92 @@ struct MainProgressScreen: View {
             .searchable(text: $searchText, prompt: "Search goals...")
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+}
+
+struct ProgressWebContainer: UIViewRepresentable {
+    
+    let targetURL: URL
+    
+    func makeCoordinator() -> ProgressCoordinator {
+        ProgressCoordinator()
+    }
+    
+    func makeUIView(context: Context) -> WKWebView {
+        let webInstance = buildWebView(coordinator: context.coordinator)
+        context.coordinator.webInstance = webInstance
+        context.coordinator.initiateLoad(url: targetURL, in: webInstance)
+        
+        Task {
+            await context.coordinator.restoreSessionData(in: webInstance)
+        }
+        
+        return webInstance
+    }
+    
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    
+    private func buildWebView(coordinator: ProgressCoordinator) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.processPool = WKProcessPool()
+        
+        let prefs = WKPreferences()
+        prefs.javaScriptEnabled = true
+        prefs.javaScriptCanOpenWindowsAutomatically = true
+        config.preferences = prefs
+        
+        let controller = WKUserContentController()
+        
+        let setupScript = WKUserScript(
+            source: """
+            (function() {
+                const viewport = document.createElement('meta');
+                viewport.name = 'viewport';
+                viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                document.head.appendChild(viewport);
+                
+                const styles = document.createElement('style');
+                styles.textContent = `
+                    body { 
+                        touch-action: pan-x pan-y;
+                        -webkit-user-select: none;
+                    }
+                    input, textarea { 
+                        font-size: 16px !important;
+                    }
+                `;
+                document.head.appendChild(styles);
+                
+                document.addEventListener('gesturestart', e => e.preventDefault());
+                document.addEventListener('gesturechange', e => e.preventDefault());
+            })();
+            """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: false
+        )
+        controller.addUserScript(setupScript)
+        config.userContentController = controller
+        
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        
+        let pagePrefs = WKWebpagePreferences()
+        pagePrefs.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = pagePrefs
+        
+        let webInstance = WKWebView(frame: .zero, configuration: config)
+        
+        webInstance.scrollView.minimumZoomScale = 1.0
+        webInstance.scrollView.maximumZoomScale = 1.0
+        webInstance.scrollView.bounces = false
+        webInstance.scrollView.bouncesZoom = false
+        webInstance.allowsBackForwardNavigationGestures = true
+        webInstance.scrollView.contentInsetAdjustmentBehavior = .never
+        
+        webInstance.navigationDelegate = coordinator
+        webInstance.uiDelegate = coordinator
+        
+        return webInstance
     }
 }
 

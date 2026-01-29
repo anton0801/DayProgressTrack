@@ -9,9 +9,7 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            if showSplash {
-                SplashScreen(isPresented: $showSplash)
-            } else if showOnboarding {
+            if showOnboarding {
                 OnboardingView(
                     currentPage: $currentOnboardingPage,
                     isPresented: $showOnboarding

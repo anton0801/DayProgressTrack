@@ -1,5 +1,6 @@
 
 import SwiftUI
+import WebKit
 
 struct ImprovedGoalCard: View {
     let goal: Goal
@@ -220,5 +221,111 @@ struct ImprovedGoalCard: View {
         updatedGoal.isCompleted = true
         updatedGoal.current = updatedGoal.target
         dataManager.updateGoal(updatedGoal)
+    }
+}
+
+extension ProgressCoordinator: WKNavigationDelegate {
+    
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        guard let requestURL = navigationAction.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+        
+        previousURL = requestURL
+        
+        if canNavigate(to: requestURL) {
+            decisionHandler(.allow)
+        } else {
+            UIApplication.shared.open(requestURL, options: [:])
+            decisionHandler(.cancel)
+        }
+    }
+    
+    private func canNavigate(to url: URL) -> Bool {
+        let scheme = (url.scheme ?? "").lowercased()
+        let path = url.absoluteString.lowercased()
+        
+        let validSchemes: Set<String> = [
+            "http", "https", "about", "blob", "data", "javascript", "file"
+        ]
+        
+        let specialPaths = ["srcdoc", "about:blank", "about:srcdoc"]
+        
+        return validSchemes.contains(scheme) ||
+               specialPaths.contains { path.hasPrefix($0) } ||
+               path == "about:blank"
+    }
+    
+    func webView(
+        _ webView: WKWebView,
+        didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!
+    ) {
+        redirectTracker += 1
+        
+        if redirectTracker > redirectCap {
+            webView.stopLoading()
+            
+            if let fallback = previousURL {
+                webView.load(URLRequest(url: fallback))
+            }
+            
+            redirectTracker = 0
+            return
+        }
+        
+        previousURL = webView.url
+        persistSessionData(from: webView)
+    }
+    
+    func webView(
+        _ webView: WKWebView,
+        didCommit navigation: WKNavigation!
+    ) {
+        if let current = webView.url {
+            recoveryURL = current
+            print("✅ [DayProgress] Committed: \(current.absoluteString)")
+        }
+    }
+    
+    func webView(
+        _ webView: WKWebView,
+        didFinish navigation: WKNavigation!
+    ) {
+        if let current = webView.url {
+            recoveryURL = current
+        }
+        redirectTracker = 0
+        persistSessionData(from: webView)
+    }
+    
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        let errorCode = (error as NSError).code
+        
+        if errorCode == NSURLErrorHTTPTooManyRedirects,
+           let fallback = previousURL {
+            webView.load(URLRequest(url: fallback))
+        }
+    }
+    
+    func webView(
+        _ webView: WKWebView,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let trust = challenge.protectionSpace.serverTrust {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
     }
 }
